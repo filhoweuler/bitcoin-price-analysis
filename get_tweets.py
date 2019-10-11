@@ -2,33 +2,62 @@
 Lets start importing a 3 month period ...
 01/01/2019 - 30/03/2019
 '''
-
+from influxdb import InfluxDBClient
 import twitterscraper
 import pickle
 import time
 import datetime as dt
-import logging
+import random
+
+def convert_timestamp(ts):
+    '''
+    Converts seconds precision timestamps to nanoseconds precision.
+
+    Also adds a random number to make sure tweets in the same second are unique.
+    '''
+    return ts * 1000000000 + random.randint(1,1000000000)
+
+def tweet_to_json(tweet):
+    d = {
+        'measurement': 'tweet',
+        'tags': {
+            'likes': tweet.likes,
+            'replies': tweet.replies,
+            'retweets': tweet.retweets
+        },
+        'time': convert_timestamp(tweet.timestamp_epochs),
+        'fields': {
+            'text': tweet.text[:10]
+        }
+    }
+
+    return [d]
 
 start_date = dt.date(2019, 1, 1)
+
+
+
+db_client = InfluxDBClient('localhost', 8086, 'root', 'root', 'bitcoin_tweets')
 
 for date in (start_date + dt.timedelta(n) for n in range(90)):
 
     start_time = time.time()
 
-    print(f"Starting on day {date} ...")
-    tweets = twitterscraper.query_tweets("bitcoin OR Bitcoin OR btc OR BTC OR Btc", begindate=date, enddate=date + dt.timedelta(1), lang='en')
-    
-    logging.getLogger('twitterscraper').setLevel(logging.CRITICAL)
-    logging.getLogger('urllib3').setLevel(logging.CRITICAL)
-    logging.getLogger('requests').setLevel(logging.CRITICAL)
+    with open('logs.txt', 'a+') as f:
+        f.write(f"Starting on day {date} ...\n")
+        tweets = twitterscraper.query_tweets("bitcoin OR Bitcoin OR btc OR BTC OR Btc", begindate=date, enddate=date + dt.timedelta(1), lang='en')
 
-    print(f"---- Found {len(tweets)} tweets. ----")
-    print(f"---- Took {time.time() - start_time} seconds ----")
+        f.write(f"---- Found {len(tweets)} tweets. ----\n")
+        f.write(f"---- Took {time.time() - start_time} seconds ----\n")
 
-    file_name = 'tweets/btc_tweets_' + str(date)
+    # file_name = 'tweets/btc_tweets_' + str(date)
 
-    with open(file_name, 'wb') as f:
-        pickle.dump(tweets, f)
+    # with open(file_name, 'wb') as f:
+    #     pickle.dump(tweets, f)
+
+    for t in tweets:
+        j = tweet_to_json(t)
+        db_client.write_points(j)
 
     
 
