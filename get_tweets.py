@@ -48,11 +48,6 @@ for date in (start_date + dt.timedelta(n) for n in range(50)):
         f.write(f"---- Found {len(tweets)} tweets. ----\n")
         f.write(f"---- Took {time.time() - start_time} seconds ----\n")
 
-    # file_name = 'tweets/btc_tweets_' + str(date)
-
-    # with open(file_name, 'wb') as f:
-    #     pickle.dump(tweets, f)
-
     for t in tweets:
         j = tweet_to_json(t)
         db_client.write_points(j)
