@@ -27,19 +27,17 @@ def tweet_to_json(tweet):
         },
         'time': convert_timestamp(tweet.timestamp_epochs),
         'fields': {
-            'text': tweet.text[:10]
+            'text': tweet.text
         }
     }
 
     return [d]
 
-start_date = dt.date(2019, 1, 1)
-
-
+start_date = dt.date(2019, 3, 25)
 
 db_client = InfluxDBClient('localhost', 8086, 'root', 'root', 'bitcoin_tweets')
 
-for date in (start_date + dt.timedelta(n) for n in range(90)):
+for date in (start_date + dt.timedelta(n) for n in range(50)):
 
     start_time = time.time()
 
