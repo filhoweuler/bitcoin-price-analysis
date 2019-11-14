@@ -22,10 +22,11 @@ def clean(text):
 # - Limpa os textos (OK)
 # - Analisa os sentimentos (OK)
 # - Calcula features dos tweets (OK)
-# - Busca dados sobre bitcoins naquela hora
-# - Insere datapoint (vetor de feature)
+# - Busca dados sobre bitcoins naquela hora (OK)
+# - Calcula datapoint (vetor de feature) (OK)
 
 # - Calcula a função Z(t) objetivo para aquele datapoint (baseado no paper entropy-21)
+# - Guarda tudo com Pickle
 
 # Objetivo: 2160 datapoints
 
@@ -33,6 +34,26 @@ db_client = InfluxDBClient('localhost', 8086, 'root', 'root', 'bitcoin_tweets')
 
 def to_ns(ts):
     return int(ts) * 1000000000
+
+def get_hourly_btc_data(time):
+    '''
+    Get stats for starting at {time}
+
+    --- Note that you need to use a time/timestamp that is actually present in the database ---
+    '''
+    print(time)
+    results = db_client.query(f'SELECT * FROM bitcoin WHERE time = {to_ns(time.timestamp())}')
+
+    return next(results.get_points())
+
+def get_hourly_btc_features(time):
+    '''
+    Calculate hourly BTC features for {time}
+    '''
+
+    # [ close, high, low, open, volumeto ]
+    data = get_hourly_btc_data(time)
+    return [ data['close'], data['high'], data['low'], data['open'], data['volumeto'] ]
 
 def get_tweets(time):
     '''
@@ -88,35 +109,23 @@ def get_hourly_tweet_features(time):
     # [ neu, norm, neg, pos, pol ]
     return [sum_neu/n , sum_neg/n, sum_norm/n, sum_pos/n, math.sqrt( sum_pos/n * sum_neg/n )]
 
-def get_all_tweets(start_time, data_points=24):
-    '''
-    Get {data_points} hourly tweets starting at {start_time}.
-    '''
-    all_data = []
+def get_hourly_features(time):
+    return get_hourly_btc_features(time) + get_hourly_tweet_features(time)
 
-    for date in (start_time + dt.timedelta(n) for n in range(data_points)):
+# def get_all_tweets(start_time, data_points=24):
+#     '''
+#     Get {data_points} hourly tweets starting at {start_time}.
+#     '''
+#     all_data = []
 
-        data = get_tweets(date)
-        print(len(data))
-        all_data.append(data)
+#     for date in (start_time + dt.timedelta(n) for n in range(data_points)):
 
-    return all_data
+#         data = get_tweets(date)
+#         print(len(data))
+#         all_data.append(data)
 
-start_date = dt.datetime(2019, 1, 15,tzinfo=dt.timezone.utc)
+#     return all_data
 
-# print(start_date.timestamp())
-# print((start_date + dt.timedelta(hours=1)).timestamp())
+start_date = dt.datetime(2019, 1, 16, hour=15,tzinfo=dt.timezone.utc)
 
-# for d in data:
-#     print('-'*25)
-#     print(d['text'])
-#     print('-'*25)
-
-# print(len(get_all_tweets(start_date)))
-# for t in get_hourly_clean_tweets(start_date):
-#     print("-"*20)
-#     print(t)
-#     print("-"*20)
-
-# print(analyze_sentiment("Hello, I'm very happy today with Bitcoin! :)"))
-print(get_hourly_tweet_features(start_date))
+print(get_hourly_btc_data(start_date))
