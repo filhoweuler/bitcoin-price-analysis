@@ -4,6 +4,10 @@ import math
 import datetime as dt
 import re
 import cProfile
+import pickle
+
+class NoTweetsException(Exception):
+    pass
 
 def clean(text):
     '''
@@ -109,6 +113,9 @@ def get_hourly_tweet_features(time):
     tweets = get_hourly_clean_tweets(time)
     n = len(tweets)
 
+    if n == 0:
+        raise NoTweetsException("No tweets found for this hour")
+
     sum_neu = 0
     sum_neg = 0
     sum_norm = 0
@@ -137,15 +144,23 @@ def get_all(start_time, data_points=24):
 
     for date in (start_time + dt.timedelta(hours=n) for n in range(data_points)):
         print(f"---- Started {date} ----")
-        vt.append(get_hourly_features(date))
-        print("---- Calculating target ----")
-        zt.append(get_hourly_target_function(date))
+        
+        try:
+            vt.append(get_hourly_features(date))
+            print("---- Calculating target ----")
+            zt.append(get_hourly_target_function(date))
+        except NoTweetsException:
+            print("No tweets found for this hour... Continuing")
 
     return (vt, zt)
 
-start_date = dt.datetime(2019, 1, 16, hour=15,tzinfo=dt.timezone.utc)
+start_date = dt.datetime(2019, 1, 1, hour=0,tzinfo=dt.timezone.utc)
 
-cProfile.run('get_all(start_date, data_points=3)')
+# cProfile.run('get_all(start_date, data_points=3)')
 
 # Save datapoints as a tuple
-# datapoints = get_all(start_date, data_points=2160)
+datapoints = get_all(start_date, data_points=2160)
+
+with open('datapoints_correct.pickle', 'wb') as f:
+    pickle.dump(datapoints, f)
+
