@@ -137,22 +137,38 @@ def get_hourly_features(time):
 
 def get_all(start_time, data_points=24):
     '''
-    Get {data_points} hourly datapoints starting at {start_time}.
+    Get twitter, market and twitter + market {data_points} hourly datapoints starting at {start_time}.
     '''
-    vt = []
-    zt = []
+    twitter_vt = []
+    twitter_zt = []
+
+    mixed_vt = []
+    mixed_zt = []
+
+    market_vt = []    
+    market_zt = []
 
     for date in (start_time + dt.timedelta(hours=n) for n in range(data_points)):
         print(f"---- Started {date} ----")
+
+        target = get_hourly_target_function(date)
+
+        market_features = get_hourly_btc_features(date)
+        market_vt.append(market_features)
+        market_zt.append(target)
         
         try:
-            vt.append(get_hourly_features(date))
-            print("---- Calculating target ----")
-            zt.append(get_hourly_target_function(date))
+            twitter_features = get_hourly_tweet_features(date)
+
+            twitter_vt.append(twitter_features)
+            twitter_zt.append(target)
+
+            mixed_vt.append(twitter_features + market_features)
+            mixed_zt.append(target)
         except NoTweetsException:
             print("No tweets found for this hour... Continuing")
 
-    return (vt, zt)
+    return (twitter_vt, twitter_zt, market_vt, market_zt, mixed_vt, mixed_zt)
 
 start_date = dt.datetime(2019, 1, 1, hour=0,tzinfo=dt.timezone.utc)
 
@@ -161,6 +177,14 @@ start_date = dt.datetime(2019, 1, 1, hour=0,tzinfo=dt.timezone.utc)
 # Save datapoints as a tuple
 datapoints = get_all(start_date, data_points=2160)
 
-with open('datapoints_correct.pickle', 'wb') as f:
-    pickle.dump(datapoints, f)
+twitter_data = (datapoints[0], datapoints[1])
+market_data = (datapoints[2], datapoints[3])
+mixed_data = (datapoints[4], datapoints[5])
+
+with open('twitter_datapoints.pickle', 'wb') as f:
+    pickle.dump(twitter_data, f)
+with open('market_datapoints.pickle', 'wb') as f:
+    pickle.dump(market_data, f)
+with open('mixed_datapoints.pickle', 'wb') as f:
+    pickle.dump(mixed_data, f)
 
