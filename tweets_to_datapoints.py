@@ -3,6 +3,7 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import math
 import datetime as dt
 import re
+import cProfile
 
 def clean(text):
     '''
@@ -24,16 +25,33 @@ def clean(text):
 # - Calcula features dos tweets (OK)
 # - Busca dados sobre bitcoins naquela hora (OK)
 # - Calcula datapoint (vetor de feature) (OK)
+# - Calcula a função Z(t) objetivo para aquele datapoint (OK)
 
-# - Calcula a função Z(t) objetivo para aquele datapoint (baseado no paper entropy-21)
 # - Guarda tudo com Pickle
 
 # Objetivo: 2160 datapoints
 
 db_client = InfluxDBClient('localhost', 8086, 'root', 'root', 'bitcoin_tweets')
 
+# Building the analyzer takes the most time from vader
+analyzer = SentimentIntensityAnalyzer()
+
 def to_ns(ts):
     return int(ts) * 1000000000
+
+def get_hourly_target_function(time):
+    '''
+    Get Z(t) for the hour starting at {time}.
+
+    Z(t) is defined as follows:
+        - If there is an increment in the closing price between t and t+1, Z(t) = 1
+        - else, Z(t) = -1
+    '''
+
+    current_closing = get_hourly_btc_data(time)['close']
+    next_closing = get_hourly_btc_data(time + dt.timedelta(hours=1))['close']
+
+    return 1 if next_closing >= current_closing else -1
 
 def get_hourly_btc_data(time):
     '''
@@ -41,7 +59,6 @@ def get_hourly_btc_data(time):
 
     --- Note that you need to use a time/timestamp that is actually present in the database ---
     '''
-    print(time)
     results = db_client.query(f'SELECT * FROM bitcoin WHERE time = {to_ns(time.timestamp())}')
 
     return next(results.get_points())
@@ -83,7 +100,6 @@ def analyze_sentiment(text):
     '''
     Given a clean piece of text, analyze VaderSentiment scores for it
     '''
-    analyzer = SentimentIntensityAnalyzer()
     return analyzer.polarity_scores(text)
 
 def get_hourly_tweet_features(time):
@@ -112,20 +128,24 @@ def get_hourly_tweet_features(time):
 def get_hourly_features(time):
     return get_hourly_btc_features(time) + get_hourly_tweet_features(time)
 
-# def get_all_tweets(start_time, data_points=24):
-#     '''
-#     Get {data_points} hourly tweets starting at {start_time}.
-#     '''
-#     all_data = []
+def get_all(start_time, data_points=24):
+    '''
+    Get {data_points} hourly datapoints starting at {start_time}.
+    '''
+    vt = []
+    zt = []
 
-#     for date in (start_time + dt.timedelta(n) for n in range(data_points)):
+    for date in (start_time + dt.timedelta(hours=n) for n in range(data_points)):
+        print(f"---- Started {date} ----")
+        vt.append(get_hourly_features(date))
+        print("---- Calculating target ----")
+        zt.append(get_hourly_target_function(date))
 
-#         data = get_tweets(date)
-#         print(len(data))
-#         all_data.append(data)
-
-#     return all_data
+    return (vt, zt)
 
 start_date = dt.datetime(2019, 1, 16, hour=15,tzinfo=dt.timezone.utc)
 
-print(get_hourly_btc_data(start_date))
+cProfile.run('get_all(start_date, data_points=3)')
+
+# Save datapoints as a tuple
+# datapoints = get_all(start_date, data_points=2160)
