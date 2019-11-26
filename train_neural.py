@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import confusion_matrix
 
-with open('twitter_datapoints_dirty.pickle', 'rb') as f:
+with open('daily_market_datapoints.pickle', 'rb') as f:
     data = pickle.load(f)
 
 scaler = preprocessing.StandardScaler()
@@ -43,7 +43,6 @@ for i in range(50):
     print(f"Accuracy Score: {accuracy_score(Z_test, Z_predict)}")
 
     print("Confusion Matrix:")
-    # Confusion Matrix, Basically it works like this.
     print(confusion_matrix(Z_test, Z_predict))
 
     if acc > max_acc:
