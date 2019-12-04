@@ -13,3 +13,7 @@ pyvenv.cfg
 .venv
 pip-selfcheck.json
 __pycache__
+*.pickle
+*.ipynb
+*.h5
+logs.txt
