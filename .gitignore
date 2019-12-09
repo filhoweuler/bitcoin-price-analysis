@@ -17,3 +17,5 @@ __pycache__
 *.ipynb
 *.h5
 logs.txt
+models/
+logs/
