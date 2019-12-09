@@ -2,60 +2,129 @@ import pickle
 import random
 import time
 import numpy as np
+import collections
+import os
 from sklearn.neural_network import MLPClassifier
 from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import f1_score
 from sklearn.metrics import confusion_matrix
 
-with open('daily_market_datapoints.pickle', 'rb') as f:
-    data = pickle.load(f)
+def get_source(filename):
+    for s in filename.split('_'):
+        if s in ['market', 'twitter', 'mixed']:
+            return s
 
-scaler = preprocessing.StandardScaler()
+    return None
 
-scaled_data = scaler.fit_transform(data[0])
-print(scaled_data)
+DATA_ROOT = 'data/'
+MODELS_ROOT = 'models/'
 
-print(len(scaled_data))
-print(len(data[1]))
+exps = ['exp1','exp2']
 
-V, V_test, Z, Z_test = train_test_split(scaled_data, data[1], test_size=0.2 , random_state = 47)
+datasets = {
+    'exp1': ['daily_twitter_datapoints.pickle', 'daily_market_datapoints.pickle', 'daily_mixed_datapoints.pickle'],
+    'exp2': ['daily_twitter_datapoints.pickle', 'daily_market_datapoints.pickle', 'daily_mixed_datapoints.pickle'],
+    'exp3': ['filtered_daily_twitter_datapoints.pickle', 'daily_market_datapoints.pickle', 'filtered_daily_mixed_datapoints.pickle'],
+    'exp4': ['filtered_daily_twitter_datapoints.pickle', 'daily_market_datapoints.pickle', 'filtered_daily_mixed_datapoints.pickle'],
+}
 
-print(len(V_test))
-print(len(Z_test))
-print(len(V))
-print(len(Z))
+mlp_config = {
+    'original': {
+        'solver':'adam', 
+        'alpha':0.0002, 
+        'hidden_layer_sizes':(30, ), 
+        'activation':'tanh'
+    },
+    'modified': {
+        'solver':'lbfgs', 
+        'alpha':0.0002,
+        'activation':'tanh',
+        'early_stopping': True, 
+        'max_iter':500, 
+        'hidden_layer_sizes':(10, )
+    },
+}
 
-max_acc = -1
-best_mlp = None
+if __name__ == "__main__":
+    BASE_TIME = str(int(time.time()))
+    os.mkdir(MODELS_ROOT + BASE_TIME)
+    FILE_DIR = MODELS_ROOT + BASE_TIME + '/'
+    LOG_FILE = open('logs/'+ BASE_TIME + '_training.logs.txt', 'w')
+    for exp in exps:
+        LOG_FILE.write(f'===== Starting Experiment {exp} =====\n')
+        for ds in datasets[exp]:
+            data_source = get_source(ds)
+            LOG_FILE.write(f'Current dataset: {data_source}')
+            with open(ds, 'rb') as f:
+                data = pickle.load(f)
 
-random.seed = time.time()
+            V, V_test, Z, Z_test = train_test_split(data[0], data[1], test_size=0.3 , random_state = 47)
 
-for i in range(50):
-    mlp = MLPClassifier(solver='adam', alpha=0.0002, early_stopping=True, learning_rate_init=0.00001, hidden_layer_sizes=(100, ), activation='tanh', max_iter=500, random_state=random.randint(0, 99999999))
+            test_file = '_'.join([FILE_DIR, exp, data_source, 'test_data'])
+            with open(test_file, 'wb') as f:
+                pickle.dump(V_test, f)                
 
-    mlp.fit(V, Z)
+            scaler = preprocessing.StandardScaler()
+            # Fit only on test data
+            scaler.fit(V)
+            V = scaler.transform(V)
+            V_test = scaler.transform(V_test)
 
-    Z_predict = mlp.predict(V_test)
+            max_precision = -1
+            best_mlp = None
 
-    acc = accuracy_score(Z_test, Z_predict)
+            random.seed = time.time()
 
-    print(f"Accuracy Score: {accuracy_score(Z_test, Z_predict)}")
+            for i in range(50):
+                config = {}
+                if exp in ['exp1', 'exp3']:
+                    config = mlp_config['original']
+                    if 'mixed' in ds:
+                        config['hidden_layer_sizes'] = (55,)
+                elif exp in ['exp2', 'exp4']:
+                    config = mlp_config['modified']
+                    if 'mixed' in ds:
+                        config['hidden_layer_sizes'] = (20,)
+                else:
+                    LOG_FILE.write("----- ERROR: Experiment id not known ------\n")
+                    break
 
-    print("Confusion Matrix:")
-    print(confusion_matrix(Z_test, Z_predict))
+                mlp = MLPClassifier(**config)
 
-    if acc > max_acc:
-        max_acc = acc
-        best_mlp = mlp
+                mlp.fit(V, Z)
+                Z_predict = mlp.predict(V_test)
+                precision = precision_score(Z_test, Z_predict)
 
-print(f"Max acc = {max_acc}")
+                if precision > max_precision:
+                    best_mlp = mlp
+                    max_precision = precision
 
-with open('twitter_adam_tanh_mlp.pickle', 'wb') as f:
-    pickle.dump(best_mlp, f)
+            Z_predict = best_mlp.predict(V_test)
+            acc = accuracy_score(Z_test, Z_predict)
+            LOG_FILE.write(f"Accuracy Score: {accuracy_score(Z_test, Z_predict)}\n")
+            precision = precision_score(Z_test, Z_predict)
+            LOG_FILE.write(f"Precision Score: {precision}\n")
+            recall = recall_score(Z_test, Z_predict)
+            LOG_FILE.write(f"Recall Score: {recall}\n")
+            f1 = f1_score(Z_test, Z_predict)
+            LOG_FILE.write(f"F1 Score: {f1}\n")
+            LOG_FILE.write("Confusion Matrix:\n")
+            LOG_FILE.write(str(confusion_matrix(Z_test, Z_predict, labels=[1, -1])))
+            LOG_FILE.write('\n\n')
 
-# for v, z in zip(data[0], data[1]):
-#     print("="*20)
-#     print(f"Features: {v}")
-#     print(f"Target: {z}")
-#     print("="*20)
+            
+            mlp_file = '_'.join([FILE_DIR, exp, data_source, 'mlp'])
+            scaler_file = '_'.join([FILE_DIR, exp, data_source, 'scaler'])
+
+            with open(mlp_file, 'wb') as f:
+                pickle.dump(best_mlp, f)
+            with open(scaler_file, 'wb') as f:
+                pickle.dump(scaler, f)
+            
+        LOG_FILE.write('===== Ending Experiment =====\n')
+
+    LOG_FILE.close()
