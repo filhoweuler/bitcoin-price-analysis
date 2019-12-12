@@ -109,11 +109,19 @@ def get_tweets(time, hours=1):
 
     return data
 
-def get_clean_tweets(time, hours=1):
+def get_clean_tweets(time, hours=1, filtered=False):
     '''
     Get {hours} of clean tweets starting from the given {time}
     '''
     data = get_tweets(time, hours)
+
+    if filtered:
+        # sort descending based on retweets number
+        data.sort(reverse=True, key=lambda d: int(d['retweets']))
+
+        # return only the top 10% of the sorted data
+        size = int( len(data) * 0.1 )
+        return [ clean(tweet['text']) for tweet in data[ : size ] ]
     
     return [ clean(tweet['text']) for tweet in data ]
 
@@ -123,11 +131,11 @@ def analyze_sentiment(text):
     '''
     return analyzer.polarity_scores(text)
 
-def get_tweet_features(time, hours=1):
+def get_tweet_features(time, hours=1, filtered=False):
     '''
     Given a time, analyze {hours} of tweets starting from that time and calculate features.
     '''
-    tweets = get_clean_tweets(time, hours)
+    tweets = get_clean_tweets(time, hours, filtered)
     n = len(tweets)
 
     if n == 0:
@@ -152,7 +160,7 @@ def get_tweet_features(time, hours=1):
 def get_features(time, hours=1):
     return get_btc_features(time, hours) + get_tweet_features(time, hours)
 
-def get_all(start_time, data_points=24, daily=False):
+def get_all(start_time, data_points=24, daily=False, filtered=False):
     '''
     Get twitter, market and twitter + market {data_points} hourly datapoints starting at {start_time}.
     '''
@@ -179,7 +187,7 @@ def get_all(start_time, data_points=24, daily=False):
         market_zt.append(target)
         
         try:
-            twitter_features = get_tweet_features(date, period)
+            twitter_features = get_tweet_features(date, period, filtered)
 
             twitter_vt.append(twitter_features)
             twitter_zt.append(target)
@@ -191,22 +199,23 @@ def get_all(start_time, data_points=24, daily=False):
 
     return (twitter_vt, twitter_zt, market_vt, market_zt, mixed_vt, mixed_zt)
 
-start_date = dt.datetime(2019, 1, 1, hour=0,tzinfo=dt.timezone.utc)
+if __name__ == '__main__':
+    start_date = dt.datetime(2019, 1, 1, hour=0,tzinfo=dt.timezone.utc)
 
-# cProfile.run('get_all(start_date, data_points=3)')
+    # cProfile.run('get_all(start_date, data_points=3)')
 
-# Save datapoints as a tuple
-datapoints = get_all(start_date, data_points=90, daily=True)
+    # Save datapoints as a tuple
+    datapoints = get_all(start_date, data_points=90, daily=True, filtered=True)
 
-twitter_data = (datapoints[0], datapoints[1])
-market_data = (datapoints[2], datapoints[3])
-mixed_data = (datapoints[4], datapoints[5])
+    twitter_data = (datapoints[0], datapoints[1])
+    market_data = (datapoints[2], datapoints[3])
+    mixed_data = (datapoints[4], datapoints[5])
 
-with open('daily_twitter_datapoints.pickle', 'wb') as f:
-    pickle.dump(twitter_data, f)
-with open('daily_market_datapoints.pickle', 'wb') as f:
-    pickle.dump(market_data, f)
-with open('daily_mixed_datapoints.pickle', 'wb') as f:
-    pickle.dump(mixed_data, f)
+    with open('filtered_daily_twitter_datapoints.pickle', 'wb') as f:
+        pickle.dump(twitter_data, f)
+    with open('filtered_daily_market_datapoints.pickle', 'wb') as f:
+        pickle.dump(market_data, f)
+    with open('filtered_daily_mixed_datapoints.pickle', 'wb') as f:
+        pickle.dump(mixed_data, f)
 
-# print(get_btc_data(start_date, hours=24))
+    # print(get_btc_data(start_date, hours=24))

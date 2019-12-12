@@ -33,14 +33,14 @@ def tweet_to_json(tweet):
 
     return [d]
 
-# start_date = dt.date(2019, 3, 15)
+start_date = dt.date(2019, 4, 24)
 
-crawl_dates = [ dt.date(2019, 3, 17), dt.date(2019, 3, 18), dt.date(2019, 3, 24), dt.date(2019, 3, 26) ]
+# crawl_dates = [ dt.date(2019, 3, 17), dt.date(2019, 3, 18), dt.date(2019, 3, 24), dt.date(2019, 3, 26) ]
 
 db_client = InfluxDBClient('localhost', 8086, 'root', 'root', 'bitcoin_tweets')
 
-# for date in (start_date + dt.timedelta(n) for n in range(50)):
-for date in crawl_dates:
+for date in (start_date + dt.timedelta(n) for n in range(50)):
+# for date in crawl_dates:
 
     start_time = time.time()
 

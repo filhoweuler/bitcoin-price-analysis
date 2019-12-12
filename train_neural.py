@@ -5,6 +5,8 @@ import numpy as np
 import collections
 import os
 from sklearn.neural_network import MLPClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
 from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
@@ -23,7 +25,7 @@ def get_source(filename):
 DATA_ROOT = 'data/'
 MODELS_ROOT = 'models/'
 
-exps = ['exp1','exp2']
+exps = ['exp1','exp2', 'exp3', 'exp4']
 
 datasets = {
     'exp1': ['daily_twitter_datapoints.pickle', 'daily_market_datapoints.pickle', 'daily_mixed_datapoints.pickle'],
@@ -56,9 +58,10 @@ if __name__ == "__main__":
     LOG_FILE = open('logs/'+ BASE_TIME + '_training.logs.txt', 'w')
     for exp in exps:
         LOG_FILE.write(f'===== Starting Experiment {exp} =====\n')
+        print(f'===== Starting Experiment {exp} =====\n')
         for ds in datasets[exp]:
             data_source = get_source(ds)
-            LOG_FILE.write(f'Current dataset: {data_source}')
+            LOG_FILE.write(f'\nCurrent dataset: {data_source}')
             with open(ds, 'rb') as f:
                 data = pickle.load(f)
 
@@ -93,7 +96,7 @@ if __name__ == "__main__":
                     LOG_FILE.write("----- ERROR: Experiment id not known ------\n")
                     break
 
-                mlp = MLPClassifier(**config)
+                mlp = MLPClassifier(**config, random_state=42)
 
                 mlp.fit(V, Z)
                 Z_predict = mlp.predict(V_test)
@@ -101,19 +104,49 @@ if __name__ == "__main__":
 
                 if precision > max_precision:
                     best_mlp = mlp
-                    max_precision = precision
+                    max_precision = precision          
+
+            # MLP data
 
             Z_predict = best_mlp.predict(V_test)
             acc = accuracy_score(Z_test, Z_predict)
-            LOG_FILE.write(f"Accuracy Score: {accuracy_score(Z_test, Z_predict)}\n")
+            LOG_FILE.write(f"MLP Accuracy Score: {accuracy_score(Z_test, Z_predict)}\n")
             precision = precision_score(Z_test, Z_predict)
-            LOG_FILE.write(f"Precision Score: {precision}\n")
+            LOG_FILE.write(f"MLP Precision Score: {precision}\n")
             recall = recall_score(Z_test, Z_predict)
-            LOG_FILE.write(f"Recall Score: {recall}\n")
+            LOG_FILE.write(f"MLP Recall Score: {recall}\n")
             f1 = f1_score(Z_test, Z_predict)
-            LOG_FILE.write(f"F1 Score: {f1}\n")
-            LOG_FILE.write("Confusion Matrix:\n")
-            LOG_FILE.write(str(confusion_matrix(Z_test, Z_predict, labels=[1, -1])))
+            LOG_FILE.write(f"MLP F1 Score: {f1}\n")
+            LOG_FILE.write('\n\n')
+
+            # Random Forest
+            rf = RandomForestClassifier(n_estimators=1000)
+            rf.fit(V,Z)
+
+            Z_predict = rf.predict(V_test)
+            acc = accuracy_score(Z_test, Z_predict)
+            LOG_FILE.write(f"Random Forest Accuracy Score: {accuracy_score(Z_test, Z_predict)}\n")
+            precision = precision_score(Z_test, Z_predict)
+            LOG_FILE.write(f"Random Forest Precision Score: {precision}\n")
+            recall = recall_score(Z_test, Z_predict)
+            LOG_FILE.write(f"Random Forest Recall Score: {recall}\n")
+            f1 = f1_score(Z_test, Z_predict)
+            LOG_FILE.write(f"Random Forest F1 Score: {f1}\n")
+            LOG_FILE.write('\n\n')
+
+            # SVM
+            svm = SVC(kernel='rbf')
+            svm.fit(V,Z)
+            
+            Z_predict = svm.predict(V_test)
+            acc = accuracy_score(Z_test, Z_predict)
+            LOG_FILE.write(f"SVM Accuracy Score: {accuracy_score(Z_test, Z_predict)}\n")
+            precision = precision_score(Z_test, Z_predict)
+            LOG_FILE.write(f"SVM Precision Score: {precision}\n")
+            recall = recall_score(Z_test, Z_predict)
+            LOG_FILE.write(f"SVM Recall Score: {recall}\n")
+            f1 = f1_score(Z_test, Z_predict)
+            LOG_FILE.write(f"SVM F1 Score: {f1}\n")
             LOG_FILE.write('\n\n')
 
             
@@ -126,5 +159,6 @@ if __name__ == "__main__":
                 pickle.dump(scaler, f)
             
         LOG_FILE.write('===== Ending Experiment =====\n')
+        print('===== Ending Experiment =====\n')
 
     LOG_FILE.close()
